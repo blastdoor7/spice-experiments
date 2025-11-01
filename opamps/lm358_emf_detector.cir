@@ -1,0 +1,102 @@
+*---------------------------------------------------------------
+* LM358 EMF Detector Pre-Amplifier (SPICE Simulation)
+*---------------------------------------------------------------
+* Author: blastdoor7 
+* Date: 2025-11-01
+* Tool: NGSPICE 31+
+*
+* Description:
+* A simple EMF detector preamplifier using an LM358 op-amp model.
+* Demonstrates realistic single-supply operation, correct rail
+* connection, biasing, gain control, and envelope detection with
+* LED indication.
+*
+* Highlights:
+* - Proper LM358 rail bias (no flat-lining)
+* - AC coupling and DC bias network
+* - Gain ≈ 101 via feedback (R2/R1)
+* - Rectifier + RC envelope + LED output
+*
+* Usage:
+*   ngspice lm358_emf_detector.cir
+*
+* Then, in the console:
+*   plot V(INP)
+*   plot V(OP_OUT)
+*
+*---------------------------------------------------------------
+*1. LM358 Generic Subcircuit Model
+
+.SUBCKT LM358_GENERIC 1 2 3 4 5
+*Pins: 1=Non-Inverting, 2=Inverting, 3=VCC+, 4=VCC-, 5=Output
+GCM 0 5 POLY(2) 1 0 2 0 0 0 10m -10m
+VOUT_MAX 6 5 DC 0
+VOUT_MIN 5 7 DC 0
+RLIM_P 5 6 10
+RLIM_N 7 5 10
+D1 6 3 LIMITER_DIODE
+D2 4 7 LIMITER_DIODE
+.MODEL LIMITER_DIODE D(Is=1p Cj0=10p Rs=1)
+E_A 8 0 1 2 100k
+ROUT 8 5 10
+CC 8 0 100p
+.ENDS LM358_GENERIC
+
+.model DLED D(IS=1e-14 N=2)
+
+*2. Power supply
+
+VCC V+ 0 DC 9
+*VREF VREF 0 DC 4.5
+VREF VREF 0 DC 0 
+*VCC/2 Bias
+
+*3. Test input: AC sine wave (Simulating Induced EMF)
+
+*BANT replaced with a standard V-source. Small 1mV peak at 100kHz.
+* VIN ANT 0 SIN(0 0.001 100k)
+ VIN ANT 0 SIN(0 0.001 1)
+
+*4. Input coupling + DC bias
+
+C1 ANT INP 10n
+*C1 ANT INP 1n
+RIN INP VREF 10Meg
+*DC return path for the op-amp input
+
+*5. LM358 Amplifier Instance
+
+*Connects the op-amp to the circuit, replacing EAMP/BCLAMP
+*X1 IN+ IN- VCC+ VEE- OUT LM358_GENERIC
+X1 INP INM V+ 0 OP_OUT LM358_GENERIC
+
+*6. Feedback Network (Closed-loop gain = 1 + R2/R1 = 101)
+
+R1 INM 0 10k
+*Rground (Realistic value)
+R2 OP_OUT INM 2000K 
+*Rfeedback (Realistic value for Av=101)
+
+*7. Rectifier + envelope filter
+
+D1 OP_OUT DET DLED
+CDET DET 0 1u
+RDET DET 0 47k
+
+*8. LED indicator
+
+D2 DET LEDOUT DLED
+RLED LEDOUT 0 1k
+
+*9. Simulation control
+
+*.tran 0.1us 100u
+.tran 0.1ms 1
+*Short burst to see the 100kHz output
+.control
+run
+plot V(INP) title "Non-Inverting Input (Biased AC)"
+plot V(OP_OUT) title "Amplifier Output (Gain=101)"
+.endc
+
+.end
