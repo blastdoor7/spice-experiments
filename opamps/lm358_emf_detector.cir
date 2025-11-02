@@ -99,4 +99,5 @@ plot V(INP) title "Non-Inverting Input (Biased AC)"
 plot V(OP_OUT) title "Amplifier Output (Gain=101)"
 .endc
 
+
 .end
